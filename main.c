@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define ROWS 20
 #define COLS 10
@@ -19,32 +21,86 @@ typedef struct {
     int x, y;
 } Tetromino;
 
-Tetromino t_block = {
-    .shape = {
-        {0, 0, 0, 0},
-        {0, 1, 1, 1},
-        {0, 0, 1, 0},
-        {0, 0, 0, 0}
+Tetromino tetrominoes[] = {
+    {   // T-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 1},
+            {0, 0, 1, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
     },
-    .x = 3,
-    .y = 0
+    {   // I-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {1, 1, 1, 1},
+            {0, 0, 0, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
+    },
+    {   // O-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 0},
+            {0, 1, 1, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 4, .y = 0
+    },
+    {   // L-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 1},
+            {0, 1, 0, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
+    },
+    {   // J-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 1},
+            {0, 0, 0, 1},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
+    },
+    {   // S-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 0, 1, 1},
+            {0, 1, 1, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
+    },
+    {   // Z-Block
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 0},
+            {0, 0, 1, 1},
+            {0, 0, 0, 0}
+        },
+        .x = 3, .y = 0
+    }
 };
+
+Tetromino t_block;
 
 const int SCREEN_WIDTH = COLS * BLOCK_SIZE;
 const int SCREEN_HEIGHT = ROWS * BLOCK_SIZE;
-const int FPS = 60;
-const int frameDelay = 1000 / FPS;
-
-
-Uint32 frameStart;
-int frameTime;
 
 void placeBlockInGrid();
 int checkCollision(int newX, int newY);
 void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino);
 void spawnNewBlock();
+void rotateBlock(Tetromino *tetromino);
 
 int main(int argc, char *args[]) {
+    srand(time(NULL));
+    
     atexit(SDL_Quit);
     SDL_Window* screen = NULL;
 
@@ -71,13 +127,14 @@ int main(int argc, char *args[]) {
         return 1;
     }
 
+    spawnNewBlock();
+
     SDL_Event event;
     int running = 1;
     Uint32 lastDropTime = SDL_GetTicks();
     Uint32 dropInterval = 500;
 
     while (running) {
-        frameStart = SDL_GetTicks();
 
         // clearing screen
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -131,13 +188,11 @@ int main(int argc, char *args[]) {
                             t_block.y += 1;
                         }
                         break;
+                    case SDLK_UP:
+                        rotateBlock(&t_block);
+                        break;
                 }
             }
-        }
-
-        frameTime = SDL_GetTicks() - frameStart;
-        if (frameDelay > frameTime) {
-            SDL_Delay(frameDelay - frameTime);
         }
     }
 
@@ -175,13 +230,13 @@ void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino) {
     for (int i = 0; i < TETROMINO_SIZE; i++) {
         for (int j = 0; j < TETROMINO_SIZE; j++) {
             if (tetromino->shape[i][j] == 1) {
-                SDL_Rect t_block = {
+                SDL_Rect rect = {
                     (tetromino->x + j) * BLOCK_SIZE,
                     (tetromino->y + i) * BLOCK_SIZE,  
                     BLOCK_SIZE,
                     BLOCK_SIZE,
                 };
-                SDL_RenderFillRect(renderer, &t_block);
+                SDL_RenderFillRect(renderer, &rect);
             }
         }
     }
@@ -190,24 +245,16 @@ void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino) {
 
 // spawn new t_block
 void spawnNewBlock() {
-    Tetromino newBlock = {
-        .shape = {
-            {0, 0, 0, 0},
-            {0, 1, 1, 1},
-            {0, 0, 1, 0},
-            {0, 0, 0, 0}
-        },
-        .x = 3,
-        .y = 0
-    };
+    
+    int randomIndex = rand() % 7;
+    t_block = tetrominoes[randomIndex];
 
     // Check if the new block collides immediately (game over scenario)
-    if (checkCollision(newBlock.x, newBlock.y)) {
+    if (checkCollision(t_block.x, t_block.y)) {
         printf("Game Over!\n");
         exit(0);
     }
 
-    t_block = newBlock;
 }
 
 // collision logic
@@ -231,4 +278,20 @@ int checkCollision(int newX, int newY) {
     }
 
     return 0;
+}
+
+void rotateBlock(Tetromino *tetromino) {
+    int temp[TETROMINO_SIZE][TETROMINO_SIZE] = {0};
+
+    for (int i = 0; i < TETROMINO_SIZE; i++) {
+        for (int j = 0; j < TETROMINO_SIZE; j++) {
+            temp[j][TETROMINO_SIZE - 1 - i] = tetromino->shape[i][j];
+        }
+    }
+
+    for (int i = 0; i < TETROMINO_SIZE; i++) {
+        for (int j = 0; j < TETROMINO_SIZE; j++) {
+            tetromino->shape[i][j] = temp[i][j];
+        }
+    }
 }
