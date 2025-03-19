@@ -4,6 +4,7 @@
 #define ROWS 20
 #define COLS 10
 #define BLOCK_SIZE 40
+#define TETROMINO_SIZE 4
 
 /* 
     Compile: gcc -o tetris main.c $(pkg-config --cflags --libs sdl2)
@@ -13,22 +14,38 @@
 // initialize grid
 int grid[ROWS][COLS] = {0};
 
+typedef struct {
+    int shape[TETROMINO_SIZE][TETROMINO_SIZE];
+    int x, y;
+} Tetromino;
+
+Tetromino t_block = {
+    .shape = {
+        {0, 0, 0, 0},
+        {0, 1, 1, 1},
+        {0, 0, 1, 0},
+        {0, 0, 0, 0}
+    },
+    .x = 3,
+    .y = 0
+};
+
 const int SCREEN_WIDTH = COLS * BLOCK_SIZE;
 const int SCREEN_HEIGHT = ROWS * BLOCK_SIZE;
 const int FPS = 60;
 const int frameDelay = 1000 / FPS;
 
-// initialize block
-SDL_Rect block = {SCREEN_WIDTH / 2 - BLOCK_SIZE, 0, BLOCK_SIZE, BLOCK_SIZE};
 
 Uint32 frameStart;
 int frameTime;
 
 void placeBlockInGrid();
-void spawnNewBlock();
 int checkCollision(int newX, int newY);
+void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino);
+void spawnNewBlock();
 
 int main(int argc, char *args[]) {
+    atexit(SDL_Quit);
     SDL_Window* screen = NULL;
 
     if(SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -71,20 +88,19 @@ int main(int argc, char *args[]) {
             for (int col = 0; col < COLS; col++) {
                 if (grid[row][col] == 1) {
                     SDL_Rect rect = {col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE};
-                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                     SDL_RenderFillRect(renderer, &rect);
                 }
             }
         }
 
-        // drawing moving block
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        SDL_RenderFillRect(renderer, &block);
+        // drawing moving t_block
+        renderTetromino(renderer, &t_block);
 
-        // moving block down (gravity)
+        // moving t_block down (gravity)
         if (SDL_GetTicks() - lastDropTime > dropInterval) {
-            if (!checkCollision(block.x, block.y + BLOCK_SIZE)) {
-                block.y += BLOCK_SIZE;
+            if (!checkCollision(t_block.x, t_block.y + 1)) {
+                t_block.y += 1;
             } else {
                 placeBlockInGrid();
                 spawnNewBlock();
@@ -101,18 +117,18 @@ int main(int argc, char *args[]) {
             } else if(event.type == SDL_KEYDOWN) {
                 switch (event.key.keysym.sym) {
                     case SDLK_LEFT:
-                        if (!checkCollision(block.x - BLOCK_SIZE, block.y)) {
-                            block.x -= BLOCK_SIZE;
+                        if (!checkCollision(t_block.x - 1, t_block.y)) {
+                            t_block.x -= 1;
                         }
                         break;
                     case SDLK_RIGHT:
-                        if (!checkCollision(block.x + BLOCK_SIZE, block.y)) {
-                            block.x += BLOCK_SIZE;
+                        if (!checkCollision(t_block.x + 1, t_block.y)) {
+                            t_block.x += 1;
                         }
                         break;
                     case SDLK_DOWN:
-                        if (!checkCollision(block.x, block.y + BLOCK_SIZE)) {
-                            block.y += BLOCK_SIZE;
+                        if (!checkCollision(t_block.x, t_block.y + 1)) {
+                            t_block.y += 1;
                         }
                         break;
                 }
@@ -132,27 +148,87 @@ int main(int argc, char *args[]) {
     return 0;
 }
 
-// store block upon landing
+// store t_block upon landing
 void placeBlockInGrid() {
-    int gridX = block.x / BLOCK_SIZE;
-    int gridY = block.y / BLOCK_SIZE;
 
-    grid[gridY][gridX] = 1;
+    for (int i = 0; i < TETROMINO_SIZE; i++) {
+        for (int j = 0; j < TETROMINO_SIZE; j++) {
+            if (t_block.shape[i][j] == 1) {
+                int gridX = t_block.x + j;
+                int gridY = t_block.y + i;
+
+                if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
+                    grid[gridY][gridX] = 1;
+                }
+            }
+        }
+    }
+
+    spawnNewBlock();
 }
 
-// spawn new block
+// render the t_block
+void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino) {
+    
+    SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+
+    for (int i = 0; i < TETROMINO_SIZE; i++) {
+        for (int j = 0; j < TETROMINO_SIZE; j++) {
+            if (tetromino->shape[i][j] == 1) {
+                SDL_Rect t_block = {
+                    (tetromino->x + j) * BLOCK_SIZE,
+                    (tetromino->y + i) * BLOCK_SIZE,  
+                    BLOCK_SIZE,
+                    BLOCK_SIZE,
+                };
+                SDL_RenderFillRect(renderer, &t_block);
+            }
+        }
+    }
+    
+}
+
+// spawn new t_block
 void spawnNewBlock() {
-    block.x = SCREEN_WIDTH / 2 - BLOCK_SIZE;
-    block.y = 0;
+    Tetromino newBlock = {
+        .shape = {
+            {0, 0, 0, 0},
+            {0, 1, 1, 1},
+            {0, 0, 1, 0},
+            {0, 0, 0, 0}
+        },
+        .x = 3,
+        .y = 0
+    };
+
+    // Check if the new block collides immediately (game over scenario)
+    if (checkCollision(newBlock.x, newBlock.y)) {
+        printf("Game Over!\n");
+        exit(0);
+    }
+
+    t_block = newBlock;
 }
 
 // collision logic
 int checkCollision(int newX, int newY) {
-    int gridX = newX / BLOCK_SIZE;
-    int gridY = newY / BLOCK_SIZE;
+    
+    for (int i = 0; i < TETROMINO_SIZE; i++) {
+        for (int j = 0; j < TETROMINO_SIZE; j++) {
+            if (t_block.shape[i][j] == 1) {
+                int gridX = newX + j;
+                int gridY = newY + i;
 
-    if (gridY >= ROWS) return 1;
-    if (grid[gridY][gridX] == 1) return 1;
+                if (gridX < 0 || gridX >= COLS || gridY >= ROWS) {
+                    return 1;
+                }
+
+                if (gridY >= 0 && grid[gridY][gridX] == 1) {
+                    return 1;
+                }
+            }
+        }
+    }
 
     return 0;
 }
