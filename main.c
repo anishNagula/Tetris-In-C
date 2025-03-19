@@ -97,6 +97,7 @@ int checkCollision(int newX, int newY);
 void renderTetromino(SDL_Renderer *renderer, Tetromino *tetromino);
 void spawnNewBlock();
 void rotateBlock(Tetromino *tetromino);
+void removeRow();
 
 int main(int argc, char *args[]) {
     srand(time(NULL));
@@ -160,6 +161,7 @@ int main(int argc, char *args[]) {
                 t_block.y += 1;
             } else {
                 placeBlockInGrid();
+                removeRow();
                 spawnNewBlock();
             }
             lastDropTime = SDL_GetTicks();
@@ -292,6 +294,33 @@ void rotateBlock(Tetromino *tetromino) {
     for (int i = 0; i < TETROMINO_SIZE; i++) {
         for (int j = 0; j < TETROMINO_SIZE; j++) {
             tetromino->shape[i][j] = temp[i][j];
+        }
+    }
+}
+
+void removeRow() {
+    for (int row = ROWS - 1; row >= 0; row--) {
+        int full = 1;
+
+        for (int col = 0; col < COLS; col++) {
+            if (grid[row][col] == 0) {
+                full = 0;
+                break;
+            }
+        }
+
+        if (full) {
+            for (int r = row; r > 0; r--) {
+                for (int c = 0; c < COLS; c++) {
+                    grid[r][c] = grid[r - 1][c];
+                }
+            }
+
+            for (int c = 0; c < COLS; c++) {
+                grid[0][c] = 0;
+            }
+
+            row++;
         }
     }
 }
